@@ -249,18 +249,23 @@
     .sec-title { font-size: .9rem; font-weight: 700; color: var(--text); }
     .sec-count { font-size: .72rem; color: var(--text3); background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; font-weight: 600; }
 
-    /* ── FAB ── */
-    .fab {
-      position: fixed; bottom: calc(var(--nav-h) + 14px + var(--b)); right: 18px;
-      width: 50px; height: 50px; border-radius: 15px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border: none; cursor: pointer; z-index: 49;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.6rem; color: #fff; font-weight: 300; line-height: 1;
-      box-shadow: 0 6px 22px rgba(124,58,237,.45);
-      transition: transform .15s, box-shadow .15s;
+    /* ── NAV ADD BUTTON ── */
+    .nav-btn-add {
+      flex: 1; background: none; border: none; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 6px 4px; position: relative;
     }
-    .fab:active { transform: scale(.88); }
+    .nav-add-icon {
+      width: 42px; height: 42px; border-radius: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; color: #fff; font-weight: 300; line-height: 1;
+      box-shadow: 0 4px 14px rgba(124,58,237,.45);
+      transition: transform .15s, box-shadow .15s;
+      margin-top: -10px;
+    }
+    .nav-btn-add:active .nav-add-icon { transform: scale(.88); box-shadow: 0 2px 6px rgba(124,58,237,.3); }
+    .nav-btn-add .nav-label { font-size: .63rem; color: var(--accent2); font-weight: 700; letter-spacing: .02em; }
 
     /* ── TRANSACTION LIST ── */
     .tx-list { display: flex; flex-direction: column; gap: 7px; }
@@ -703,10 +708,10 @@ service cloud.firestore {
   <nav class="bottom-nav">
     <button class="nav-btn active" data-nav="home"><div class="nav-pill"></div><span class="nav-icon">🏠</span><span class="nav-label">Início</span></button>
     <button class="nav-btn" data-nav="todos"><div class="nav-pill"></div><span class="nav-icon">📋</span><span class="nav-label">Todos</span></button>
+    <button class="nav-btn-add" id="fab"><div class="nav-add-icon">＋</div><span class="nav-label">Novo</span></button>
     <button class="nav-btn" data-nav="graficos"><div class="nav-pill"></div><span class="nav-icon">📊</span><span class="nav-label">Gráficos</span></button>
     <button class="nav-btn" data-nav="config"><div class="nav-pill"></div><span class="nav-icon">⚙️</span><span class="nav-label">Config</span></button>
   </nav>
-  <button class="fab" id="fab">＋</button>
 </div>
 
 <!-- ══════ SHEET: NOVO LANÇAMENTO ══════ -->
