@@ -282,6 +282,8 @@
     .tx-badge.pago { background: var(--green-dim); color: var(--green); }
     .tx-badge.pendente { background: var(--amber-dim); color: var(--amber); }
     .tx-badge.vencida { background: var(--red-dim); color: var(--red); }
+    .tx-badge.centro { background: rgba(124,58,237,.15); color: var(--accent2); font-size: .56rem; text-transform: none; font-weight: 700; }
+    .fchip.active.centro-active { background: rgba(124,58,237,.18); border-color: rgba(124,58,237,.35); color: var(--accent2); }
     .tx-amount { font-family: var(--mono); font-size: .88rem; font-weight: 500; flex-shrink: 0; }
     .tx-amount.receita { color: var(--green); }
     .tx-amount.despesa { color: var(--red); }
@@ -573,6 +575,9 @@
         <span class="fchip" data-fs="Pago">Pagos</span>
         <span class="fchip" data-fs="Pendente">Pendentes</span>
       </div>
+      <div class="filter-wrap" id="centroFilterWrap" style="display:none">
+        <span class="fchip active" data-fc="">🏷️ Todos</span>
+      </div>
       <div class="tx-list" id="txList">
         <div id="loadingState" style="text-align:center;padding:36px;color:var(--text3)">
           <div class="spin" style="margin:0 auto 10px"></div>
@@ -722,6 +727,23 @@ service cloud.firestore {
       </div>
     </div>
     <input type="hidden" id="statusField" value="Pendente"/>
+    <div class="fg"><label>Centro de Custo</label>
+      <select id="fCentro">
+        <option value="">— Sem categoria —</option>
+        <option value="Alimentação">🍽️ Alimentação</option>
+        <option value="Moradia">🏠 Moradia</option>
+        <option value="Transporte">🚗 Transporte</option>
+        <option value="Saúde">🏥 Saúde</option>
+        <option value="Educação">📚 Educação</option>
+        <option value="Lazer">🎮 Lazer</option>
+        <option value="Vestuário">👕 Vestuário</option>
+        <option value="Salário">💼 Salário</option>
+        <option value="Investimento">📈 Investimento</option>
+        <option value="Serviços">🔧 Serviços</option>
+        <option value="Impostos">🧾 Impostos</option>
+        <option value="Outros">📦 Outros</option>
+      </select>
+    </div>
     <button class="btn-save" id="btnSave" onclick="submitForm()">✓ Salvar Lançamento</button>
     <button class="btn-cancel" onclick="closeSheet('formSheet')">Cancelar</button>
   </div>
@@ -736,6 +758,7 @@ service cloud.firestore {
     <div style="font-size:.84rem;color:var(--text2);margin-bottom:14px;font-weight:500" id="detailDesc">—</div>
     <div class="detail-row"><span class="detail-key">Vencimento</span><span class="detail-val" id="detailDate">—</span></div>
     <div class="detail-row"><span class="detail-key">Status</span><span id="detailStatus">—</span></div>
+    <div class="detail-row"><span class="detail-key">Centro de Custo</span><span class="detail-val" id="detailCentro">—</span></div>
     <div class="detail-row"><span class="detail-key">ID</span><span class="detail-val" id="detailId" style="font-family:var(--mono);font-size:.72rem;color:var(--text3)">—</span></div>
     <div class="detail-actions">
       <button class="btn-detail blue" onclick="editFromDetail()">✏️ Editar</button>
@@ -838,7 +861,7 @@ const S = {
   chartPeriod: 'mes',
   editId: null,
   detailId: null,
-  filter: { type: '', status: '' },
+  filter: { type: '', status: '', custo: '' },
   allFilter: { type: '', status: '' },
   charts: {},
   unsubscribe: null,
@@ -1145,7 +1168,7 @@ function showApp() {
 
   // Reseta estado para novo usuário
   S.items = [];
-  S.filter = { type: '', status: '' };
+  S.filter = { type: '', status: '', custo: '' };
   S.allFilter = { type: '', status: '' };
   S.activeTab = 'home';
 
@@ -1165,6 +1188,8 @@ function showApp() {
   document.querySelectorAll('[data-afs]').forEach(x => x.classList.remove('active'));
   if (document.getElementById('searchInput')) document.getElementById('searchInput').value = '';
   if (document.getElementById('searchAll'))   document.getElementById('searchAll').value = '';
+  const cfw = document.getElementById('centroFilterWrap');
+  if (cfw) cfw.style.display = 'none';
 
   // Limpa listas antes de carregar
   document.getElementById('txList').innerHTML = `
@@ -1256,12 +1281,13 @@ async function apiDelete(id) {
 ══════════════════════════════════════ */
 function normItem(raw) {
   return {
-    id: raw.id || genId(),
-    tipo: normTipo(raw.tipo),
-    descricao: raw.descricao || raw.description || '',
-    valor: parseFloat(String(raw.valor || '0').replace(',', '.')) || 0,
-    vencimento: parseISODate(String(raw.vencimento || '')),
-    status: normStatus(raw.status),
+    id:          raw.id || genId(),
+    tipo:        normTipo(raw.tipo),
+    descricao:   raw.descricao || raw.description || '',
+    valor:       parseFloat(String(raw.valor || '0').replace(',', '.')) || 0,
+    vencimento:  parseISODate(String(raw.vencimento || '')),
+    status:      normStatus(raw.status),
+    centroCusto: raw.centroCusto || '',
   };
 }
 function normTipo(v) { const s = String(v||'').toLowerCase(); return s === 'receita' ? 'Receita' : 'Despesa'; }
@@ -1305,7 +1331,11 @@ function getMonthYear() {
 }
 
 function setupMonthFilter() {
-  document.getElementById('monthFilter').addEventListener('change', () => { updateSummary(); renderHomeList(); });
+  document.getElementById('monthFilter').addEventListener('change', () => {
+    S.filter.custo = '';
+    updateSummary();
+    renderHomeList();
+  });
 }
 
 /* ══════════════════════════════════════
@@ -1352,10 +1382,12 @@ function renderHomeList() {
     if (d.getMonth() !== mes || d.getFullYear() !== ano) return false;
     if (S.filter.type && l.tipo !== S.filter.type) return false;
     if (S.filter.status && l.status !== S.filter.status) return false;
+    if (S.filter.custo && l.centroCusto !== S.filter.custo) return false;
     if (search && !l.descricao.toLowerCase().includes(search)) return false;
     return true;
   }).sort((a,b) => new Date(a.vencimento) - new Date(b.vencimento));
   setEl('monthCount', items.length);
+  updateCentroChips();
   renderTxList('txList', items, today);
 }
 
@@ -1384,11 +1416,14 @@ function renderTxList(containerId, items, today) {
     const badgeCls = overdue ? 'vencida' : item.status.toLowerCase();
     const badgeTxt = overdue ? '⚠️ Vencida' : (item.status === 'Pago' ? '✅ Pago' : '⏳ Pendente');
     const icon = item.tipo === 'Receita' ? '💰' : '💳';
+    const centroBadge = item.centroCusto
+      ? `<span class="tx-badge centro">${esc(item.centroCusto)}</span>`
+      : '';
     return `<div class="tx-item ${overdue?'overdue':''}" onclick="openDetail('${esc(item.id)}')">
       <div class="tx-icon ${item.tipo.toLowerCase()}">${icon}</div>
       <div class="tx-body">
         <div class="tx-desc">${esc(item.descricao)}</div>
-        <div class="tx-date">${fmtDate(item.vencimento)} <span class="tx-badge ${badgeCls}">${badgeTxt}</span></div>
+        <div class="tx-date">${fmtDate(item.vencimento)} <span class="tx-badge ${badgeCls}">${badgeTxt}</span>${centroBadge}</div>
       </div>
       <div class="tx-amount ${item.tipo.toLowerCase()}">${item.tipo==='Receita'?'+':'-'}${fmtCur(item.valor)}</div>
     </div>`;
@@ -1411,6 +1446,7 @@ function openDetail(id) {
   setEl('detailDesc', item.descricao);
   setEl('detailDate', fmtDate(item.vencimento));
   setEl('detailId', item.id);
+  setEl('detailCentro', item.centroCusto || '— Sem categoria');
   const st = document.getElementById('detailStatus');
   if (overdue) st.innerHTML = '<span class="tx-badge vencida">⚠️ Vencida</span>';
   else if (item.status === 'Pago') st.innerHTML = '<span class="tx-badge pago">✅ Pago</span>';
@@ -1431,6 +1467,7 @@ function editFromDetail() {
   document.getElementById('fValor').value = fmtInput(item.valor);
   document.getElementById('fVenc').value = item.vencimento;
   document.getElementById('fParc').value = 1;
+  document.getElementById('fCentro').value = item.centroCusto || '';
   setTipo(item.tipo); setStatus(item.status);
   openSheet('formSheet');
 }
@@ -1466,18 +1503,20 @@ function openNewForm() {
   document.getElementById('fValor').value = '';
   document.getElementById('fVenc').value = todayStr();
   document.getElementById('fParc').value = 1;
+  document.getElementById('fCentro').value = '';
   setTipo('Despesa'); setStatus('Pendente');
   openSheet('formSheet');
 }
 
 async function submitForm() {
-  const desc   = document.getElementById('fDesc').value.trim();
-  const valor  = parseCur(document.getElementById('fValor').value);
-  const venc   = document.getElementById('fVenc').value;
-  const tipo   = document.getElementById('tipoField').value;
-  const status = document.getElementById('statusField').value;
-  const parc   = parseInt(document.getElementById('fParc').value) || 1;
-  const editId = document.getElementById('editId').value;
+  const desc    = document.getElementById('fDesc').value.trim();
+  const valor   = parseCur(document.getElementById('fValor').value);
+  const venc    = document.getElementById('fVenc').value;
+  const tipo    = document.getElementById('tipoField').value;
+  const status  = document.getElementById('statusField').value;
+  const parc    = parseInt(document.getElementById('fParc').value) || 1;
+  const editId  = document.getElementById('editId').value;
+  const centro  = document.getElementById('fCentro').value;
   if (!desc || !valor || !venc) { toast('Preencha todos os campos obrigatórios.', 'error'); return; }
   const btn = document.getElementById('btnSave');
   btn.disabled = true; btn.innerHTML = '<div class="spin"></div>';
@@ -1485,7 +1524,7 @@ async function submitForm() {
     const item = S.items.find(l => l.id === editId);
     if (item) {
       item.tipo = tipo; item.descricao = desc; item.valor = valor;
-      item.vencimento = venc; item.status = status;
+      item.vencimento = venc; item.status = status; item.centroCusto = centro;
       await apiUpdate(item);
     }
     toast('Lançamento atualizado!', 'success');
@@ -1496,6 +1535,7 @@ async function submitForm() {
         id: genId(), tipo,
         descricao: parc > 1 ? `${desc} (${i+1}/${parc})` : desc,
         valor, vencimento: addMonths(venc, i), status,
+        centroCusto: centro,
         dataCriacao: new Date().toISOString(),
       };
       if (await apiCreate(item)) ok++;
@@ -1653,6 +1693,45 @@ function setupFilters() {
       document.querySelectorAll('[data-afs]').forEach(x => x.classList.remove('active'));
       if (!active) { el.classList.add('active'); S.allFilter.status = el.dataset.afs; } else S.allFilter.status = '';
       renderAllList();
+    });
+  });
+}
+
+/* Reconstrói os chips de centro de custo com base nos itens do mês atual */
+function updateCentroChips() {
+  const { mes, ano } = getMonthYear();
+  const wrap = document.getElementById('centroFilterWrap');
+  if (!wrap) return;
+
+  const centros = new Set(
+    S.items
+      .filter(l => {
+        const d = new Date(l.vencimento + 'T00:00:00');
+        return d.getMonth() === mes && d.getFullYear() === ano && l.centroCusto;
+      })
+      .map(l => l.centroCusto)
+  );
+
+  if (centros.size === 0) {
+    wrap.style.display = 'none';
+    S.filter.custo = '';
+    return;
+  }
+
+  wrap.style.display = 'flex';
+  wrap.innerHTML = `<span class="fchip ${!S.filter.custo ? 'active centro-active' : ''}" data-fc="">🏷️ Todos</span>` +
+    [...centros].sort().map(c =>
+      `<span class="fchip ${S.filter.custo === c ? 'active centro-active' : ''}" data-fc="${esc(c)}">${esc(c)}</span>`
+    ).join('');
+
+  wrap.querySelectorAll('[data-fc]').forEach(el => {
+    el.addEventListener('click', () => {
+      wrap.querySelectorAll('[data-fc]').forEach(x => {
+        x.classList.remove('active', 'centro-active');
+      });
+      el.classList.add('active', 'centro-active');
+      S.filter.custo = el.dataset.fc;
+      renderHomeList();
     });
   });
 }
