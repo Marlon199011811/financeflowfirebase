@@ -355,6 +355,12 @@
     .user-avatar { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
     .user-info-body strong { font-size: .88rem; display: block; margin-bottom: 2px; }
     .user-info-body span { font-size: .75rem; color: var(--text3); }
+    .profile-details { background: var(--bg3); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 4px; }
+    .profile-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px; border-bottom: 1px solid var(--border); }
+    .profile-detail-row:last-child { border-bottom: none; }
+    .profile-detail-key { font-size: .76rem; color: var(--text3); font-weight: 600; }
+    .profile-detail-val { font-size: .78rem; color: var(--text); font-weight: 500; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .uid-val { font-family: var(--mono); font-size: .66rem; color: var(--text3); }
     .fb-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,152,0,.12); border: 1px solid rgba(255,152,0,.25); color: #FFA000; border-radius: 20px; padding: 5px 12px; font-size: .75rem; font-weight: 700; margin-bottom: 12px; }
     code { background: var(--surface); border: 1px solid var(--border2); padding: 2px 6px; border-radius: 5px; font-size: .75rem; color: var(--accent2); font-family: var(--mono); }
     .code-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 14px; font-family: var(--mono); font-size: .7rem; color: #6ee7b7; white-space: pre; overflow-x: auto; line-height: 1.7; max-height: 240px; overflow-y: auto; margin: 10px 0; }
@@ -608,7 +614,7 @@
     <div class="tab-pane" id="pane-config">
       <div style="font-size:.95rem;font-weight:800;margin-bottom:14px;letter-spacing:-.02em">⚙️ Configurações</div>
       <div class="config-card">
-        <h3>👤 Conta</h3>
+        <h3>👤 Meu Perfil</h3>
         <div class="user-info-row">
           <div class="user-avatar">👤</div>
           <div class="user-info-body">
@@ -616,7 +622,22 @@
             <span id="cfgUserEmail">—</span>
           </div>
         </div>
-        <div style="display:flex;gap:8px">
+        <div class="profile-details">
+          <div class="profile-detail-row">
+            <span class="profile-detail-key">📱 Telefone</span>
+            <span class="profile-detail-val" id="cfgUserTel">Não informado</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="profile-detail-key">📅 Membro desde</span>
+            <span class="profile-detail-val" id="cfgUserSince">—</span>
+          </div>
+          <div class="profile-detail-row">
+            <span class="profile-detail-key">🔑 UID</span>
+            <span class="profile-detail-val uid-val" id="cfgUserUid">—</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn-cfg primary" onclick="openEditPerfil()">✏️ Editar Perfil</button>
           <button class="btn-cfg" onclick="openChangePassword()">🔑 Alterar Senha</button>
           <button class="btn-cfg danger" id="cfgLogout">⬅ Sair</button>
         </div>
@@ -639,6 +660,14 @@
         <div class="code-block">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Perfil do usuário — cada um acessa só o seu
+    match /usuarios/{userId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+
+    // Lançamentos financeiros — isolados por usuário
     match /users/{userId}/lancamentos/{doc} {
       allow read, write: if request.auth != null
         && request.auth.uid == userId;
@@ -740,6 +769,29 @@ service cloud.firestore {
   </div>
 </div>
 
+<!-- ══════ EDIT PROFILE SHEET ══════ -->
+<div class="sheet-overlay" id="editPerfilSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">✏️ Editar Perfil</div>
+    <div class="fg"><label>Nome completo</label>
+      <div class="af-wrap" style="border-radius:var(--radius-xs)">
+        <span class="af-icon">👤</span>
+        <input type="text" id="editNome" placeholder="Seu nome"/>
+      </div>
+    </div>
+    <div class="fg"><label>Telefone</label>
+      <div class="af-wrap" style="border-radius:var(--radius-xs)">
+        <span class="af-icon">📱</span>
+        <input type="tel" id="editTel" placeholder="(00) 00000-0000" inputmode="tel"/>
+      </div>
+    </div>
+    <div class="auth-err" id="editPerfilErr"></div>
+    <button class="btn-save" onclick="doUpdateProfile()">✓ Salvar Perfil</button>
+    <button class="btn-cancel" onclick="closeSheet('editPerfilSheet')">Cancelar</button>
+  </div>
+</div>
+
 <!-- ══════ CONFIRM DIALOG ══════ -->
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-card">
@@ -764,7 +816,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore, collection, doc, addDoc, setDoc, updateDoc,
-  deleteDoc, getDocs, query, orderBy, onSnapshot
+  deleteDoc, getDocs, getDoc, query, orderBy, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ── Chart.js via CDN (non-module) ──
@@ -781,6 +833,7 @@ const S = {
   items: [],
   app: null, auth: null, db: null,
   user: null,
+  perfil: null,
   activeTab: 'home',
   chartPeriod: 'mes',
   editId: null,
@@ -822,10 +875,35 @@ const FIREBASE_CONFIG = {
         // Garante limpeza completa antes de carregar novo usuário
         if (S.unsubscribe) { S.unsubscribe(); S.unsubscribe = null; }
         S.items = [];
-        S.user = user;
+        S.user  = user;
+
+        // Carrega perfil da coleção `usuarios`
+        try {
+          const snap = await getDoc(doc(S.db, 'usuarios', user.uid));
+          if (snap.exists()) {
+            S.perfil = snap.data();
+          } else {
+            // Usuário antigo sem doc no Firestore — cria automaticamente
+            const perfil = {
+              uid:          user.uid,
+              nome:         user.displayName || user.email.split('@')[0],
+              email:        user.email,
+              fotoPerfil:   '',
+              telefone:     '',
+              criadoEm:     serverTimestamp(),
+              atualizadoEm: serverTimestamp(),
+            };
+            await setDoc(doc(S.db, 'usuarios', user.uid), perfil);
+            S.perfil = perfil;
+          }
+        } catch(e) {
+          S.perfil = null;
+        }
+
         document.getElementById('authScreen').style.display = 'none';
         showApp();
       } else {
+        S.perfil = null;
         hideApp();
         document.getElementById('authScreen').style.display = 'flex';
         switchAuthTab('login');
@@ -886,8 +964,20 @@ async function doRegister() {
   if (pass.length < 6) { showErr(err, 'A senha deve ter pelo menos 6 caracteres.'); return; }
   setLoading('btnRegister','regTxt','regSpin',true);
   try {
+    // 1. Cria usuário no Firebase Auth
     const cred = await createUserWithEmailAndPassword(S.auth, email, pass);
     await updateProfile(cred.user, { displayName: name });
+
+    // 2. Salva perfil na coleção `usuarios/{uid}` do Firestore
+    await setDoc(doc(S.db, 'usuarios', cred.user.uid), {
+      uid:        cred.user.uid,
+      nome:       name,
+      email:      email,
+      fotoPerfil: '',
+      telefone:   '',
+      criadoEm:   serverTimestamp(),
+      atualizadoEm: serverTimestamp(),
+    });
   } catch(e) {
     setLoading('btnRegister','regTxt','regSpin',false);
     showErr(err, friendlyError(e.code));
@@ -933,6 +1023,52 @@ window.doChangePassword = doChangePassword;
 function openChangePassword() { openSheet('changePassSheet'); }
 window.openChangePassword = openChangePassword;
 
+/* ── UPDATE PROFILE ── */
+async function doUpdateProfile() {
+  const nome = document.getElementById('editNome')?.value.trim();
+  const tel  = document.getElementById('editTel')?.value.trim();
+  const err  = document.getElementById('editPerfilErr');
+  if (!nome) { showErr(err, 'O nome não pode ficar em branco.'); return; }
+  try {
+    // Atualiza Firebase Auth
+    await updateProfile(S.auth.currentUser, { displayName: nome });
+
+    // Atualiza coleção `usuarios` no Firestore
+    await setDoc(doc(S.db, 'usuarios', S.user.uid), {
+      uid:          S.user.uid,
+      nome,
+      email:        S.user.email,
+      fotoPerfil:   S.perfil?.fotoPerfil || '',
+      telefone:     tel,
+      criadoEm:     S.perfil?.criadoEm || serverTimestamp(),
+      atualizadoEm: serverTimestamp(),
+    });
+
+    // Atualiza estado local
+    S.perfil = { ...S.perfil, nome, telefone: tel, atualizadoEm: { toDate: () => new Date() } };
+
+    // Atualiza UI
+    document.getElementById('topUserEmail').textContent = nome;
+    document.getElementById('cfgUserName').textContent  = nome;
+    const telEl = document.getElementById('cfgUserTel');
+    if (telEl) telEl.textContent = tel || 'Não informado';
+
+    closeSheet('editPerfilSheet');
+    toast('Perfil atualizado! ✅', 'success');
+  } catch(e) { showErr(err, friendlyError(e.code)); }
+}
+window.doUpdateProfile = doUpdateProfile;
+
+function openEditPerfil() {
+  const editNome = document.getElementById('editNome');
+  const editTel  = document.getElementById('editTel');
+  if (editNome) editNome.value = S.perfil?.nome  || S.user?.displayName || '';
+  if (editTel)  editTel.value  = S.perfil?.telefone || '';
+  document.getElementById('editPerfilErr').style.display = 'none';
+  openSheet('editPerfilSheet');
+}
+window.openEditPerfil = openEditPerfil;
+
 /* ── LOGOUT ── */
 async function doLogout() {
   const ok = await confirm2('Sair', 'Deseja sair do FinanceFlow?');
@@ -977,10 +1113,29 @@ function showApp() {
   const app = document.getElementById('appScreen');
   app.style.display = 'flex'; app.classList.add('in');
 
-  // Atualiza dados do usuário logado
-  document.getElementById('topUserEmail').textContent = S.user?.email || '';
-  document.getElementById('cfgUserName').textContent  = S.user?.displayName || S.user?.email?.split('@')[0] || '—';
-  document.getElementById('cfgUserEmail').textContent = S.user?.email || '—';
+  // Atualiza dados do usuário logado (prefere perfil do Firestore)
+  const nome  = S.perfil?.nome  || S.user?.displayName || S.user?.email?.split('@')[0] || '—';
+  const email = S.perfil?.email || S.user?.email || '—';
+  const tel   = S.perfil?.telefone || '';
+  const desde = S.perfil?.criadoEm?.toDate
+    ? S.perfil.criadoEm.toDate().toLocaleDateString('pt-BR')
+    : '—';
+
+  document.getElementById('topUserEmail').textContent = nome;
+  document.getElementById('cfgUserName').textContent  = nome;
+  document.getElementById('cfgUserEmail').textContent = email;
+  const telEl = document.getElementById('cfgUserTel');
+  if (telEl) telEl.textContent = tel || 'Não informado';
+  const desdeEl = document.getElementById('cfgUserSince');
+  if (desdeEl) desdeEl.textContent = desde;
+  const uidEl = document.getElementById('cfgUserUid');
+  if (uidEl) uidEl.textContent = S.user?.uid || '—';
+
+  // Preenche formulário de edição de perfil
+  const editNome = document.getElementById('editNome');
+  const editTel  = document.getElementById('editTel');
+  if (editNome) editNome.value = nome;
+  if (editTel)  editTel.value  = tel;
 
   // Registra listeners apenas uma vez
   if (!S.setupDone) {
@@ -1499,7 +1654,7 @@ function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
 window.closeSheet = closeSheet;
 
-['formSheet','detailSheet','changePassSheet'].forEach(id => {
+['formSheet','detailSheet','changePassSheet','editPerfilSheet'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) closeSheet(id); });
 });
