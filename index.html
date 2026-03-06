@@ -556,7 +556,7 @@
         <span style="font-size:.74rem;color:var(--blue)">▾</span>
       </div>
       <div class="summary-grid">
-        <div class="s-card green"><span class="s-card-icon">💰</span><div class="s-card-label">Receitas</div><div class="s-card-value" id="c-rec">R$ 0</div><div class="s-card-meta" id="c-rec-m">0 itens</div><span class="s-card-bg-icon">💰</span></div>
+        <div class="s-card green"><span class="s-card-icon">💰</span><div class="s-card-label">Recebido</div><div class="s-card-value" id="c-rec">R$ 0</div><div class="s-card-meta" id="c-rec-m">0 pago(s) de 0</div><span class="s-card-bg-icon">💰</span></div>
         <div class="s-card red"><span class="s-card-icon">💳</span><div class="s-card-label">Despesas</div><div class="s-card-value" id="c-desp">R$ 0</div><div class="s-card-meta" id="c-desp-m">0 itens</div><span class="s-card-bg-icon">💳</span></div>
         <div class="s-card blue"><span class="s-card-icon">📊</span><div class="s-card-label">Saldo</div><div class="s-card-value" id="c-saldo">R$ 0</div><div class="s-card-meta" id="c-saldo-m">—</div><span class="s-card-bg-icon">📊</span></div>
         <div class="s-card amber"><span class="s-card-icon">⏳</span><div class="s-card-label">Pendentes</div><div class="s-card-value" id="c-pend">R$ 0</div><div class="s-card-meta" id="c-pend-m">0 itens</div><span class="s-card-bg-icon">⏳</span></div>
@@ -1317,16 +1317,23 @@ function updateSummary() {
     const d = new Date(l.vencimento + 'T00:00:00');
     return d.getMonth() === mes && d.getFullYear() === ano;
   });
-  const recs  = doMes.filter(l => l.tipo === 'Receita');
-  const desps = doMes.filter(l => l.tipo === 'Despesa');
-  const pends = doMes.filter(l => l.status === 'Pendente');
-  const totR = recs.reduce((a,l) => a+l.valor, 0);
+  const recs      = doMes.filter(l => l.tipo === 'Receita');
+  const recsPagas = recs.filter(l => l.status === 'Pago');
+  const desps     = doMes.filter(l => l.tipo === 'Despesa');
+  const pends     = doMes.filter(l => l.status === 'Pendente');
+
+  const totR = recsPagas.reduce((a,l) => a+l.valor, 0);   // apenas pagas
   const totD = desps.reduce((a,l) => a+l.valor, 0);
   const totP = pends.reduce((a,l) => a+l.valor, 0);
   const saldo = totR - totD;
-  setEl('c-rec', fmtCur(totR)); setEl('c-rec-m', recs.length + ' lançamento(s)');
-  setEl('c-desp', fmtCur(totD)); setEl('c-desp-m', desps.length + ' lançamento(s)');
-  setEl('c-pend', fmtCur(totP)); setEl('c-pend-m', pends.length + ' pendente(s)');
+
+  setEl('c-rec', fmtCur(totR));
+  setEl('c-rec-m', `${recsPagas.length} pago(s) de ${recs.length}`);
+  setEl('c-desp', fmtCur(totD));
+  setEl('c-desp-m', desps.length + ' lançamento(s)');
+  setEl('c-pend', fmtCur(totP));
+  setEl('c-pend-m', pends.length + ' pendente(s)');
+
   const sEl = document.getElementById('c-saldo');
   sEl.textContent = (saldo < 0 ? '−' : '') + fmtCur(Math.abs(saldo));
   sEl.style.color = saldo >= 0 ? 'var(--green)' : 'var(--red)';
