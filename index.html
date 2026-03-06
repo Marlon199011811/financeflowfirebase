@@ -353,7 +353,13 @@
     .config-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 11px; }
     .config-card h3 { font-size: .9rem; font-weight: 700; margin-bottom: 10px; }
     .config-card p { font-size: .8rem; color: var(--text2); line-height: 1.7; margin-bottom: 10px; }
-    .user-info-row { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg3); border-radius: var(--radius-sm); margin-bottom: 10px; }
+    .cat-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; max-height: 280px; overflow-y: auto; }
+    .cat-list::-webkit-scrollbar { display: none; }
+    .cat-item { display: flex; align-items: center; gap: 10px; background: var(--bg3); border-radius: var(--radius-xs); padding: 10px 12px; border: 1px solid var(--border); }
+    .cat-emoji { font-size: 1.1rem; flex-shrink: 0; width: 24px; text-align: center; }
+    .cat-nome { flex: 1; font-size: .84rem; font-weight: 600; }
+    .cat-del { background: var(--red-dim); border: 1px solid rgba(244,63,94,.2); color: var(--red); border-radius: 7px; width: 26px; height: 26px; font-size: .75rem; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .cat-default-badge { font-size: .62rem; color: var(--text3); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; font-weight: 700; flex-shrink: 0; }
     .user-avatar { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
     .user-info-body strong { font-size: .88rem; display: block; margin-bottom: 2px; }
     .user-info-body span { font-size: .75rem; color: var(--text3); }
@@ -559,9 +565,9 @@
       </div>
       <div class="summary-grid">
         <div class="s-card green"><span class="s-card-icon">💰</span><div class="s-card-label">Recebido</div><div class="s-card-value" id="c-rec">R$ 0</div><div class="s-card-meta" id="c-rec-m">0 pago(s) de 0</div><span class="s-card-bg-icon">💰</span></div>
-        <div class="s-card red"><span class="s-card-icon">💳</span><div class="s-card-label">Despesas</div><div class="s-card-value" id="c-desp">R$ 0</div><div class="s-card-meta" id="c-desp-m">0 itens</div><span class="s-card-bg-icon">💳</span></div>
-        <div class="s-card blue"><span class="s-card-icon">📊</span><div class="s-card-label">Saldo</div><div class="s-card-value" id="c-saldo">R$ 0</div><div class="s-card-meta" id="c-saldo-m">—</div><span class="s-card-bg-icon">📊</span></div>
-        <div class="s-card amber"><span class="s-card-icon">⏳</span><div class="s-card-label">Pendentes</div><div class="s-card-value" id="c-pend">R$ 0</div><div class="s-card-meta" id="c-pend-m">0 itens</div><span class="s-card-bg-icon">⏳</span></div>
+        <div class="s-card red"><span class="s-card-icon">💳</span><div class="s-card-label" id="lbl-desp">Despesas</div><div class="s-card-value" id="c-desp">R$ 0</div><div class="s-card-meta" id="c-desp-m">0 itens</div><span class="s-card-bg-icon">💳</span></div>
+        <div class="s-card blue"><span class="s-card-icon">📊</span><div class="s-card-label" id="lbl-saldo">Saldo</div><div class="s-card-value" id="c-saldo">R$ 0</div><div class="s-card-meta" id="c-saldo-m">—</div><span class="s-card-bg-icon">📊</span></div>
+        <div class="s-card amber"><span class="s-card-icon">⏳</span><div class="s-card-label" id="lbl-pend">Pendentes</div><div class="s-card-value" id="c-pend">R$ 0</div><div class="s-card-meta" id="c-pend-m">0 itens</div><span class="s-card-bg-icon">⏳</span></div>
       </div>
       <div class="sec-header">
         <span class="sec-title">Lançamentos do Mês</span>
@@ -655,6 +661,13 @@
           <button class="btn-cfg primary" onclick="loadData()">🔄 Sincronizar</button>
         </div>
       </div>
+
+      <div class="config-card">
+        <h3>🏷️ Categorias</h3>
+        <p>Gerencie suas categorias personalizadas. As categorias padrão não podem ser excluídas.</p>
+        <div id="catList" class="cat-list"></div>
+        <button class="btn-cfg primary" style="width:100%;margin-top:10px" onclick="openAddCategoria()">＋ Nova Categoria</button>
+      </div>
       <div class="config-card">
         <h3>📖 Como Configurar o Firebase</h3>
         <div class="step-item"><div class="step-n">1</div><div class="step-body"><strong>Criar Projeto</strong><p>Acesse <code>console.firebase.google.com</code>, crie um projeto e adicione um App Web.</p></div></div>
@@ -730,18 +743,6 @@ service cloud.firestore {
     <div class="fg"><label>Centro de Custo</label>
       <select id="fCentro">
         <option value="">— Sem categoria —</option>
-        <option value="Alimentação">🍽️ Alimentação</option>
-        <option value="Moradia">🏠 Moradia</option>
-        <option value="Transporte">🚗 Transporte</option>
-        <option value="Saúde">🏥 Saúde</option>
-        <option value="Educação">📚 Educação</option>
-        <option value="Lazer">🎮 Lazer</option>
-        <option value="Vestuário">👕 Vestuário</option>
-        <option value="Salário">💼 Salário</option>
-        <option value="Investimento">📈 Investimento</option>
-        <option value="Serviços">🔧 Serviços</option>
-        <option value="Impostos">🧾 Impostos</option>
-        <option value="Outros">📦 Outros</option>
       </select>
     </div>
     <button class="btn-save" id="btnSave" onclick="submitForm()">✓ Salvar Lançamento</button>
@@ -815,6 +816,23 @@ service cloud.firestore {
   </div>
 </div>
 
+<!-- ══════ ADD CATEGORY SHEET ══════ -->
+<div class="sheet-overlay" id="addCatSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🏷️ Nova Categoria</div>
+    <div class="fg"><label>Emoji</label>
+      <input type="text" id="newCatEmoji" placeholder="Ex: 🏋️ 🎵 🐾" maxlength="4" style="font-size:1.4rem;text-align:center;letter-spacing:.1em"/>
+    </div>
+    <div class="fg"><label>Nome da Categoria *</label>
+      <input type="text" id="newCatNome" placeholder="Ex: Academia, Pets, Música..."/>
+    </div>
+    <div class="auth-err" id="addCatErr"></div>
+    <button class="btn-save" onclick="doAddCategoria()">✓ Criar Categoria</button>
+    <button class="btn-cancel" onclick="closeSheet('addCatSheet')">Cancelar</button>
+  </div>
+</div>
+
 <!-- ══════ CONFIRM DIALOG ══════ -->
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-card">
@@ -854,6 +872,7 @@ await new Promise((res) => {
 ══════════════════════════════════════ */
 const S = {
   items: [],
+  categorias: [],          // categorias carregadas do Firestore + defaults
   app: null, auth: null, db: null,
   user: null,
   perfil: null,
@@ -865,6 +884,7 @@ const S = {
   allFilter: { type: '', status: '' },
   charts: {},
   unsubscribe: null,
+  unsubCat: null,          // listener de categorias
   setupDone: false,
 };
 
@@ -1201,14 +1221,17 @@ function showApp() {
   updateSummary();
 
   loadData();
+  loadCategorias();
 }
 
 function hideApp() {
-  // Cancela listener do Firestore do usuário anterior IMEDIATAMENTE
+  // Cancela listeners do Firestore do usuário anterior IMEDIATAMENTE
   if (S.unsubscribe) { S.unsubscribe(); S.unsubscribe = null; }
+  if (S.unsubCat)    { S.unsubCat();    S.unsubCat    = null; }
 
   // Limpa dados do usuário anterior da memória e da UI
   S.items = [];
+  S.categorias = [];
   S.user  = null;
 
   document.getElementById('txList').innerHTML = '';
@@ -1276,6 +1299,113 @@ async function apiDelete(id) {
   } catch(e) { toast('Erro ao excluir: ' + e.message, 'error'); }
 }
 
+/* ── CATEGORIAS ── */
+const DEFAULT_CATS = [
+  { nome:'Alimentação', emoji:'🍽️' },
+  { nome:'Moradia',     emoji:'🏠' },
+  { nome:'Transporte',  emoji:'🚗' },
+  { nome:'Saúde',       emoji:'🏥' },
+  { nome:'Educação',    emoji:'📚' },
+  { nome:'Lazer',       emoji:'🎮' },
+  { nome:'Vestuário',   emoji:'👕' },
+  { nome:'Salário',     emoji:'💼' },
+  { nome:'Investimento',emoji:'📈' },
+  { nome:'Serviços',    emoji:'🔧' },
+  { nome:'Impostos',    emoji:'🧾' },
+  { nome:'Outros',      emoji:'📦' },
+];
+
+function catCollection() {
+  return collection(S.db, 'usuarios', S.user.uid, 'categorias');
+}
+
+function loadCategorias() {
+  if (S.unsubCat) S.unsubCat();
+  S.unsubCat = onSnapshot(catCollection(), snap => {
+    const custom = snap.docs.map(d => ({ id: d.id, ...d.data(), custom: true }));
+    // Merge: defaults primeiro, depois custom (sem duplicar por nome)
+    const nomes = new Set(custom.map(c => c.nome.toLowerCase()));
+    const merged = [
+      ...DEFAULT_CATS.filter(d => !nomes.has(d.nome.toLowerCase())).map(d => ({ ...d, custom: false })),
+      ...custom,
+    ].sort((a,b) => a.nome.localeCompare(b.nome));
+    S.categorias = merged;
+    rebuildCentroSelect();
+    renderCategoriasConfig();
+  });
+}
+
+async function addCategoria(nome, emoji) {
+  try {
+    await addDoc(catCollection(), { nome, emoji, criadoEm: serverTimestamp() });
+    return true;
+  } catch(e) { toast('Erro: ' + e.message, 'error'); return false; }
+}
+
+async function deleteCategoria(id) {
+  try {
+    await deleteDoc(doc(S.db, 'usuarios', S.user.uid, 'categorias', id));
+  } catch(e) { toast('Erro ao excluir: ' + e.message, 'error'); }
+}
+
+/* Reconstrói o <select> de centros no formulário */
+function rebuildCentroSelect() {
+  const sel = document.getElementById('fCentro');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Sem categoria —</option>' +
+    S.categorias.map(c =>
+      `<option value="${esc(c.nome)}">${c.emoji || '🏷️'} ${esc(c.nome)}</option>`
+    ).join('');
+  if (cur) sel.value = cur;
+}
+
+/* Renderiza lista de categorias na aba Config */
+function renderCategoriasConfig() {
+  const el = document.getElementById('catList');
+  if (!el) return;
+  if (S.categorias.length === 0) {
+    el.innerHTML = '<div style="font-size:.8rem;color:var(--text3);text-align:center;padding:12px">Nenhuma categoria ainda.</div>';
+    return;
+  }
+  el.innerHTML = S.categorias.map(c => `
+    <div class="cat-item">
+      <span class="cat-emoji">${c.emoji || '🏷️'}</span>
+      <span class="cat-nome">${esc(c.nome)}</span>
+      ${c.custom
+        ? `<button class="cat-del" onclick="confirmDeleteCat('${esc(c.id)}','${esc(c.nome)}')">✕</button>`
+        : `<span class="cat-default-badge">padrão</span>`
+      }
+    </div>`).join('');
+}
+
+async function confirmDeleteCat(id, nome) {
+  const ok = await confirm2('Excluir Categoria', `Excluir "${nome}"? Os lançamentos com essa categoria não serão afetados.`);
+  if (ok) await deleteCategoria(id);
+}
+window.confirmDeleteCat = confirmDeleteCat;
+
+function openAddCategoria() {
+  document.getElementById('newCatNome').value = '';
+  document.getElementById('newCatEmoji').value = '';
+  document.getElementById('addCatErr').style.display = 'none';
+  openSheet('addCatSheet');
+}
+window.openAddCategoria = openAddCategoria;
+
+async function doAddCategoria() {
+  const nome  = document.getElementById('newCatNome').value.trim();
+  const emoji = document.getElementById('newCatEmoji').value.trim() || '🏷️';
+  const err   = document.getElementById('addCatErr');
+  if (!nome) { showErr(err, 'Informe o nome da categoria.'); return; }
+  if (S.categorias.some(c => c.nome.toLowerCase() === nome.toLowerCase())) {
+    showErr(err, 'Já existe uma categoria com esse nome.'); return;
+  }
+  const ok = await addCategoria(nome, emoji);
+  if (ok) { closeSheet('addCatSheet'); toast(`Categoria "${nome}" criada! ✅`, 'success'); }
+}
+window.doAddCategoria = doAddCategoria;
+
 /* ══════════════════════════════════════
    DATA NORMALIZATION
 ══════════════════════════════════════ */
@@ -1341,18 +1471,25 @@ function setupMonthFilter() {
 /* ══════════════════════════════════════
    SUMMARY
 ══════════════════════════════════════ */
-function updateSummary() {
+function updateSummary(filteredItems) {
   const { mes, ano } = getMonthYear();
+
+  // Base: todos os itens do mês (para o saldo e receitas, sempre mês completo)
   const doMes = S.items.filter(l => {
     const d = new Date(l.vencimento + 'T00:00:00');
     return d.getMonth() === mes && d.getFullYear() === ano;
   });
+
+  // Se há filtro ativo (custo, tipo ou status), usa os itens filtrados para despesas e pendentes
+  const base = filteredItems || doMes;
+  const hasFilter = !!(S.filter.custo || S.filter.type || S.filter.status);
+
   const recs      = doMes.filter(l => l.tipo === 'Receita');
   const recsPagas = recs.filter(l => l.status === 'Pago');
-  const desps     = doMes.filter(l => l.tipo === 'Despesa');
-  const pends     = doMes.filter(l => l.status === 'Pendente');
+  const desps     = base.filter(l => l.tipo === 'Despesa');
+  const pends     = base.filter(l => l.status === 'Pendente');
 
-  const totR = recsPagas.reduce((a,l) => a+l.valor, 0);   // apenas pagas
+  const totR = recsPagas.reduce((a,l) => a+l.valor, 0);
   const totD = desps.reduce((a,l) => a+l.valor, 0);
   const totP = pends.reduce((a,l) => a+l.valor, 0);
   const saldo = totR - totD;
@@ -1360,9 +1497,19 @@ function updateSummary() {
   setEl('c-rec', fmtCur(totR));
   setEl('c-rec-m', `${recsPagas.length} pago(s) de ${recs.length}`);
   setEl('c-desp', fmtCur(totD));
-  setEl('c-desp-m', desps.length + ' lançamento(s)');
+  setEl('c-desp-m', hasFilter
+    ? `${desps.length} filtrado(s)`
+    : desps.length + ' lançamento(s)');
   setEl('c-pend', fmtCur(totP));
-  setEl('c-pend-m', pends.length + ' pendente(s)');
+  setEl('c-pend-m', hasFilter
+    ? `${pends.length} filtrado(s)`
+    : pends.length + ' pendente(s)');
+
+  // Labels dos cards indicam filtro ativo
+  const filterLabel = S.filter.custo ? `${S.filter.custo}` : null;
+  setEl('lbl-desp',  filterLabel ? `💳 ${filterLabel}` : 'Despesas');
+  setEl('lbl-pend',  filterLabel ? `⏳ ${filterLabel}` : 'Pendentes');
+  setEl('lbl-saldo', filterLabel ? `📊 ${filterLabel}` : 'Saldo');
 
   const sEl = document.getElementById('c-saldo');
   sEl.textContent = (saldo < 0 ? '−' : '') + fmtCur(Math.abs(saldo));
@@ -1387,6 +1534,7 @@ function renderHomeList() {
     return true;
   }).sort((a,b) => new Date(a.vencimento) - new Date(b.vencimento));
   setEl('monthCount', items.length);
+  updateSummary(items);   // ← passa itens filtrados para refletir nos cards
   updateCentroChips();
   renderTxList('txList', items, today);
 }
@@ -1740,7 +1888,7 @@ function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
 window.closeSheet = closeSheet;
 
-['formSheet','detailSheet','changePassSheet','editPerfilSheet'].forEach(id => {
+['formSheet','detailSheet','changePassSheet','editPerfilSheet','addCatSheet'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) closeSheet(id); });
 });
